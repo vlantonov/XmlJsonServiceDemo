@@ -26,6 +26,7 @@ class LoggingTest : public ::testing::Test {
 };
 
 struct ParseLevelCase {
+	// cppcheck-suppress unusedStructMember
 	const char* input;
 	spdlog::level::level_enum expected;
 };
