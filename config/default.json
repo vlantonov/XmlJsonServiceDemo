@@ -1,0 +1,12 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "base_threads": 8,
+  "max_threads": 0,
+  "max_queued": 0,
+  "max_body_bytes": 16777216,
+  "read_timeout_seconds": 30,
+  "write_timeout_seconds": 30,
+  "log_level": "info",
+  "log_file": ""
+}

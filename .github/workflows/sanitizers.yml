@@ -1,0 +1,57 @@
+name: Sanitizers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sanitizer:
+    name: ${{ matrix.sanitizer }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [asan, ubsan]
+
+    env:
+      CC: clang
+      CXX: clang++
+      ASAN_OPTIONS: "detect_leaks=1:strict_string_checks=1"
+      UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang and Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        run: |
+          if [ "${{ matrix.sanitizer }}" = "asan" ]; then
+            SANITIZER_FLAG="-DXMLJSON_ENABLE_ASAN=ON"
+          else
+            SANITIZER_FLAG="-DXMLJSON_ENABLE_UBSAN=ON"
+          fi
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXMLJSON_WARNINGS_AS_ERRORS=ON "$SANITIZER_FLAG"
+
+      - name: Build
+        run: |
+          cmake --build build
+
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure

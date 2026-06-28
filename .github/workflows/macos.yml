@@ -1,0 +1,41 @@
+name: macOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: macOS (Apple Clang)
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: |
+          brew install ninja
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXMLJSON_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: |
+          cmake --build build
+
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure

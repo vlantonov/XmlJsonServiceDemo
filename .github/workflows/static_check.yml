@@ -1,0 +1,70 @@
+name: Static Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  clang-tidy:
+    name: clang-tidy (advisory)
+    runs-on: ubuntu-22.04
+    continue-on-error: true # Advisory for initial rollout; can be made gating later.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-tidy and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang clang-tidy
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure with compile commands
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Run clang-tidy on project sources
+        run: |
+          if [ -f .clang-tidy ]; then
+            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build
+          else
+            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build -checks='-*,modernize-*,readability-*,bugprone-*,clang-analyzer-*,-modernize-use-trailing-return-type,-readability-magic-numbers,-readability-identifier-length'
+          fi
+
+  cppcheck:
+    name: cppcheck (advisory)
+    runs-on: ubuntu-22.04
+    continue-on-error: true # Advisory for initial rollout; can be made gating later.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,style,performance,portability --error-exitcode=1 --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests

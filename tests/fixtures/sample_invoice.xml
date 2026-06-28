@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<invoice id="INV-001" currency="EUR"><customer><name>Ada Lovelace</name><email>ada@example.org</email></customer><items><item sku="A1"><description>Widget</description><quantity>2</quantity><unit_price>9.99</unit_price></item><item sku="A2"><description>Gadget</description><quantity>1</quantity><unit_price>19.50</unit_price></item></items><total>39.48</total></invoice>

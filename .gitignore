@@ -1,0 +1,17 @@
+build/
+build-*/
+cmake-build-*/
+.vs/
+.vscode/
+.idea/
+*.o
+*.obj
+*.gcda
+*.gcno
+*.gcov
+coverage.info
+cov/
+compile_commands.json
+.cache/
+.DS_Store
+Thumbs.db

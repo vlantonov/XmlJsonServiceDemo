@@ -1,0 +1,38 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Windows (MSVC 2022)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        # Keep this OFF on MSVC to avoid warning noise from third-party test dependencies.
+        run: |
+          cmake -S . -B build -DXMLJSON_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        run: |
+          cmake --build build --config Release
+
+      - name: Test
+        run: |
+          ctest --test-dir build --output-on-failure -C Release
