@@ -14,7 +14,7 @@
 #include "xmljson/error.hpp"
 
 namespace xmljson {
-void apply_cli_overrides(ServerConfig& target, int argc, char** argv);
+void apply_cli_overrides(ServerConfig& target, int argc, const char* const* argv);
 }
 
 namespace {
@@ -48,16 +48,17 @@ void expect_invalid_config(const std::function<void()>& fn) {
 
 struct ArgvBuilder {
 	explicit ArgvBuilder(std::initializer_list<std::string> values) : args(values) {
-		for (auto& arg : args) {
-			argv.push_back(arg.data());
-		}
+		argv.reserve(args.size());
+		std::transform(args.begin(), args.end(), std::back_inserter(argv), [](const std::string& arg) {
+			return arg.c_str();
+		});
 	}
 
 	int argc() const { return static_cast<int>(argv.size()); }
-	char** data() { return argv.data(); }
+	const char* const* data() const { return argv.data(); }
 
 	std::vector<std::string> args;
-	std::vector<char*> argv;
+	std::vector<const char*> argv;
 };
 
 class ConfigTest : public ::testing::Test {

@@ -55,6 +55,7 @@ class Integration : public ::testing::Test {
 	int port_ = 0;
 };
 
+// cppcheck-suppress syntaxError
 TEST_F(Integration, RealisticDocument_RoundTrips_Via_Http) {
 	const std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <invoice id="INV-100" currency="EUR">

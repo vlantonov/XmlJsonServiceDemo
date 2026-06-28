@@ -110,6 +110,7 @@ nlohmann::json parse_json_or_throw(std::string_view json_text) {
 
 }  // namespace
 
+// cppcheck-suppress passedByValue
 std::string json_to_xml_impl(std::string_view json, const ConversionOptions& options) {
 	const nlohmann::json root = parse_json_or_throw(json);
 

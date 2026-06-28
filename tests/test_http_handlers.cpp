@@ -61,6 +61,7 @@ class HttpHandlersTest : public ::testing::Test {
 	std::unique_ptr<httplib::Client> client_;
 };
 
+// cppcheck-suppress syntaxError
 TEST_F(HttpHandlersTest, Healthz_Returns_Ok) {
 	const auto res = client_->Get("/healthz");
 	ASSERT_TRUE(res);

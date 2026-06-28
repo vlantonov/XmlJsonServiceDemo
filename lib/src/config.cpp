@@ -91,7 +91,7 @@ std::pair<std::string, std::optional<std::string>> split_flag(const std::string&
 	return {arg.substr(0, eq_pos), arg.substr(eq_pos + 1)};
 }
 
-std::string require_flag_value(int argc, char** argv, int& index, const std::string& flag,
+std::string require_flag_value(int argc, const char* const* argv, int& index, const std::string& flag,
 							   const std::optional<std::string>& inline_value) {
 	if (inline_value.has_value()) {
 		return *inline_value;
@@ -255,7 +255,7 @@ void validate_and_apply_config_json(ServerConfig& result, const nlohmann::json& 
 	}
 }
 
-ParsedCliFlags parse_cli_flags(int argc, char** argv) {
+ParsedCliFlags parse_cli_flags(int argc, const char* const* argv) {
 	ParsedCliFlags flags;
 
 	for (int i = 1; i < argc; ++i) {
@@ -380,7 +380,7 @@ ServerConfig load_config_from_file(const std::string& path, bool required) {
 	return result;
 }
 
-CliParseResult parse_cli(int argc, char** argv) {
+CliParseResult parse_cli(int argc, const char* const* argv) {
 	CliParseResult result;
 	const ParsedCliFlags flags = parse_cli_flags(argc, argv);
 	result.show_help = flags.show_help;
@@ -393,7 +393,7 @@ CliParseResult parse_cli(int argc, char** argv) {
 	return result;
 }
 
-void apply_cli_overrides(ServerConfig& target, int argc, char** argv) {
+void apply_cli_overrides(ServerConfig& target, int argc, const char* const* argv) {
 	const ParsedCliFlags flags = parse_cli_flags(argc, argv);
 	apply_parsed_flags(target, flags);
 }

@@ -13,10 +13,12 @@ Converter::Converter() = default;
 
 Converter::Converter(ConversionOptions options) : options_(std::move(options)) {}
 
+// cppcheck-suppress passedByValue
 std::string Converter::xml_to_json(std::string_view xml) const {
 	return xml_to_json_impl(xml, options_);
 }
 
+// cppcheck-suppress passedByValue
 std::string Converter::json_to_xml(std::string_view json) const {
 	return json_to_xml_impl(json, options_);
 }

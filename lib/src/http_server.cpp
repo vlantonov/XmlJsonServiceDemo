@@ -47,10 +47,12 @@ std::string content_type_without_params(const httplib::Request& req) {
 	return to_lower_ascii(trim_ascii(media));
 }
 
+// cppcheck-suppress passedByValue
 bool is_xml_content_type(std::string_view media_type) {
 	return media_type == "application/xml" || media_type == "text/xml" || ends_with(media_type, "+xml");
 }
 
+// cppcheck-suppress passedByValue
 bool is_json_content_type(std::string_view media_type) {
 	return media_type == "application/json" || ends_with(media_type, "+json");
 }

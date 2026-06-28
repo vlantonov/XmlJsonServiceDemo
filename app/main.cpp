@@ -23,7 +23,7 @@ extern "C" void on_signal(int) {
 }  // namespace
 
 namespace xmljson {
-void apply_cli_overrides(ServerConfig&, int, char**);
+void apply_cli_overrides(ServerConfig&, int, const char* const*);
 }
 
 int main(int argc, char** argv) {

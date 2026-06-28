@@ -42,9 +42,12 @@ std::string load_fixture(const char* name) {
 
 std::vector<std::pair<std::string, std::string>> sorted_attributes(const pugi::xml_node& node) {
 	std::vector<std::pair<std::string, std::string>> attributes;
-	for (const pugi::xml_attribute attribute : node.attributes()) {
-		attributes.emplace_back(attribute.name(), attribute.value());
-	}
+	std::transform(node.attributes().begin(),
+				   node.attributes().end(),
+				   std::back_inserter(attributes),
+				   [](const pugi::xml_attribute& attribute) {
+					   return std::make_pair(std::string(attribute.name()), std::string(attribute.value()));
+				   });
 	std::sort(attributes.begin(), attributes.end());
 	return attributes;
 }
@@ -61,11 +64,10 @@ std::string concatenated_direct_text(const pugi::xml_node& node) {
 
 std::vector<pugi::xml_node> element_children(const pugi::xml_node& node) {
 	std::vector<pugi::xml_node> children;
-	for (const pugi::xml_node child : node.children()) {
-		if (child.type() == pugi::node_element) {
-			children.push_back(child);
-		}
-	}
+	std::copy_if(node.children().begin(),
+				 node.children().end(),
+				 std::back_inserter(children),
+				 [](const pugi::xml_node& child) { return child.type() == pugi::node_element; });
 	return children;
 }
 

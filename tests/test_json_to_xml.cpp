@@ -66,9 +66,10 @@ TEST(JsonToXml, ArrayValuesBecomeRepeatedSiblings) {
 	ASSERT_STREQ(root.name(), "r");
 
 	std::vector<std::string> values;
-	for (const pugi::xml_node child : root.children("b")) {
-		values.emplace_back(child.child_value());
-	}
+	std::transform(root.children("b").begin(),
+				   root.children("b").end(),
+				   std::back_inserter(values),
+				   [](const pugi::xml_node& child) { return std::string(child.child_value()); });
 
 	const std::vector<std::string> expected = {"1", "2", "3"};
 	EXPECT_EQ(values, expected);

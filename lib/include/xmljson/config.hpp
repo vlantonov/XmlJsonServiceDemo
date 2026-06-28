@@ -34,7 +34,10 @@ struct CliParseResult {
 };
 
 /// \brief Parses CLI arguments into a partial config. Does not load the config file.
-CliParseResult parse_cli(int argc, char** argv);
+CliParseResult parse_cli(int argc, const char* const* argv);
+
+/// \brief Applies CLI overrides to an existing config without loading a config file.
+void apply_cli_overrides(ServerConfig& target, int argc, const char* const* argv);
 
 /// \brief Prints usage help to the specified output stream.
 void print_help(std::ostream& os, const char* argv0);

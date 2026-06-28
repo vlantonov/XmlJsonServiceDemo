@@ -74,6 +74,7 @@ TEST_F(LoggingTest, Init_Unknown_Level_Throws_InvalidConfig) {
 
 TEST_P(ParseLevelRecognizedTest, parse_level_Recognizes_Standard_Levels) {
 	const auto& tc = GetParam();
+	SCOPED_TRACE(tc.input);
 	EXPECT_EQ(xmljson::parse_level(tc.input), tc.expected);
 }
 
