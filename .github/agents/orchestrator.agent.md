@@ -1,7 +1,7 @@
 ---
 name: Orchestrator
 description: Orchestrates C++ portfolio work through subagents (Planner, Coder, Interface Architect)
-model: Claude Opus 4.6 (copilot)
+model: Claude Opus 4.7 (copilot)
 tools: [read/readFile, agent, vscode/memory]
 ---
 
