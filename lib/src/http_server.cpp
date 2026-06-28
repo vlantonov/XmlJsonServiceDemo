@@ -145,7 +145,7 @@ void HttpServer::Impl::install_handlers() {
 									   static_cast<std::size_t>(max_queued));
 	};
 
-	svr.set_error_handler([this](const httplib::Request& req, httplib::Response& res) {
+	svr.set_error_handler([](const httplib::Request& req, httplib::Response& res) {
 		if (!res.body.empty()) {
 			return;
 		}
@@ -153,7 +153,7 @@ void HttpServer::Impl::install_handlers() {
 		write_error_json(res, status, status_error_name(status), status_message(status), req.path);
 	});
 
-	svr.set_exception_handler([this](const httplib::Request& req, httplib::Response& res, std::exception_ptr ep) {
+	svr.set_exception_handler([](const httplib::Request& req, httplib::Response& res, std::exception_ptr ep) {
 		try {
 			if (ep) {
 				std::rethrow_exception(ep);
