@@ -57,3 +57,34 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - Favor deterministic, testable behavior.
 - Keep tests simple and focused on verifying observable behavior.
+
+## Verification (Definition of Done)
+
+A change is NOT done until the gates in `.github/copilot-instructions.md` pass
+locally. Run them before reporting completion — they mirror the gating CI jobs:
+
+1. **Strict build with clang** (clang is the strictest compiler in the matrix
+   and catches warnings GCC misses, e.g. `-Wunused-lambda-capture`):
+
+   ```bash
+   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+     -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+   cmake --build build
+   ```
+
+   `XMLJSON_WARNINGS_AS_ERRORS` defaults to OFF — always pass it `ON`, or CI will
+   fail on warnings your local build silently hid.
+
+2. **Tests**: `ctest --test-dir build --output-on-failure`
+
+3. **Static analysis**:
+
+   ```bash
+   cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
+     --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests
+   ```
+
+For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,
+`syntaxError` on gtest `TEST_F`), use narrow inline `// cppcheck-suppress`
+comments rather than changing otherwise-correct APIs. See the "Known analyzer
+quirks" section of `.github/copilot-instructions.md`.

@@ -63,6 +63,8 @@ For each phase:
 
 After all phases complete, verify the work hangs together (code compiles conceptually, generated code matches schema changes, tests cover new logic) and report results.
 
+Do NOT report completion until the Coder confirms the local CI-parity gates in `.github/copilot-instructions.md` have passed: the strict clang build (`-DXMLJSON_WARNINGS_AS_ERRORS=ON`), `ctest`, and `cppcheck`. If any gate was not run, send the work back to the Coder rather than reporting done.
+
 ## Parallelization Rules
 
 **RUN IN PARALLEL when:**

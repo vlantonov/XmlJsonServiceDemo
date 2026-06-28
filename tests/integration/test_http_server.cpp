@@ -117,7 +117,7 @@ TEST_F(Integration, Concurrent_Mixed_Conversions_All_Succeed) {
 
 	std::vector<bool> xml_to_json_direction(32, false);
 	for (int i = 0; i < 16; ++i) {
-		xml_to_json_direction[i] = true;
+		xml_to_json_direction[static_cast<std::size_t>(i)] = true;
 	}
 	std::mt19937 rng(123456u);
 	std::shuffle(xml_to_json_direction.begin(), xml_to_json_direction.end(), rng);

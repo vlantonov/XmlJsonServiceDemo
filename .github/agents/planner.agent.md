@@ -28,6 +28,7 @@ You create plans. You do NOT write code.
 - Implementation steps (ordered), each tagged with the artifacts touched (files, CMake targets, or schema definitions)
 - Sequencing constraints (e.g., "step 3 requires step 1's generated protobuf code to exist")
 - Edge cases to handle
+- **Verification step** (always last): the local gates the Coder must pass before the work is done — the strict clang build, `ctest`, and `cppcheck` commands from `.github/copilot-instructions.md`. Never omit this step.
 - Open questions (if any)
 
 ## Rules
