@@ -1,10 +1,10 @@
 # XmlJsonServiceDemo
 
-XmlJsonServiceDemo is a small C++17 HTTP service that converts XML to JSON and JSON to XML, built as a clean library-plus-transport architecture with zero manual dependency setup. It is fully self-contained via CMake FetchContent, test-driven with GoogleTest (99 passing tests), and intended to build and run consistently across Linux, macOS, and Windows.
+XmlJsonServiceDemo is a small C++17 HTTP service that converts XML to JSON and JSON to XML, built as a clean library-plus-transport architecture. Dependencies are managed with [Conan 2](https://conan.io/), test-driven with GoogleTest (99 passing tests), and ships as a Docker image.
 
 ## Status
 - 99 tests passing (94 unit + 5 integration)
-- Build: cmake + git + a C++17 compiler. Nothing else.
+- Prerequisites: **Conan >= 2.0**, **CMake >= 3.21**, a C++17 compiler
 
 ## Supported platforms
 - Linux (Ubuntu 22.04+ / GCC 11+ or Clang 14+) - primary
@@ -21,14 +21,14 @@ Threading model:
 - Request handling uses cpp-httplib's worker-pool model (`ThreadPool`) sized by `base_threads` and bounded by `max_queued`.
 - Shared lifecycle state in `HttpServer` (`running`, `bound_port`, startup state) is synchronized via atomics.
 
-## Dependencies (fetched automatically by CMake)
+## Dependencies (managed by Conan)
 | Library | Version | Purpose |
 |---|---|---|
-| cpp-httplib | v0.16.0 | HTTP server (header-only, bounded thread pool) |
-| nlohmann/json | v3.11.3 | JSON parsing & emission |
-| pugixml | v1.14 | XML parsing & emission |
-| spdlog | v1.14.1 | Structured logging |
-| GoogleTest | v1.14.0 | Unit & integration tests |
+| cpp-httplib | 0.16.0 | HTTP server (header-only, bounded thread pool) |
+| nlohmann/json | 3.11.3 | JSON parsing & emission |
+| pugixml | 1.14 | XML parsing & emission |
+| spdlog | 1.14.1 | Structured logging |
+| GoogleTest | 1.14.0 | Unit & integration tests |
 
 ## Conversion semantics
 The converter uses the following Parker-style mapping conventions:
@@ -84,12 +84,39 @@ Error envelope:
 | 500 | InternalError |
 
 ## Build
+
+### Prerequisites
+- [Conan](https://conan.io/) >= 2.0 (`pip install "conan>=2.0,<3"`)
+- CMake >= 3.21
+- A C++17 compiler (GCC, Clang, or MSVC)
+
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+# Install dependencies (run once; re-run only when conanfile.txt changes)
+mkdir -p build && cd build
+conan install .. --build=missing -pr:b=default -s build_type=Release
+cd ..
+
+# Configure & build
+cmake -S . -B build/Release \
+  -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake \
+  -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build/Release
 ```
 
-First configure downloads all dependencies via FetchContent (typically 5-10 minutes on a cold cache). Subsequent configures reuse [build/_deps](build/_deps).
+For CMake >= 3.23 with preset support, the configure step simplifies to:
+```sh
+cmake --preset conan-release
+cmake --build build/Release
+```
+
+Conan packages are cached in `~/.conan2/p`; subsequent installs reuse them.
+
+### Docker
+```sh
+docker build -t xmljson-service .
+docker run --rm -p 8080:8080 xmljson-service
+```
 
 ### CMake options
 | Option | Default | Description |
