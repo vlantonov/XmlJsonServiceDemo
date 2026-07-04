@@ -25,7 +25,7 @@ Call the Planner agent with the user's request. The Planner will return implemen
 
 ### Step 2: Parse Into Phases
 
-The Planner's response includes **artifact assignments** for each step. An "artifact" is a file, a CMake target, OR a schema definition (.proto/.avsc) plus the code generated from it. Use these to determine parallelization:
+The Planner's response includes **artifact assignments** for each step. An "artifact" is a file, a CMake target, a schema definition (.proto/.avsc) plus the code generated from it, the **Conan `conanfile`** (dependency manifest), OR the **Docker packaging files** (`Dockerfile`, `.dockerignore`, `docker-compose.yml`). Use these to determine parallelization:
 
 1. Extract the artifact list from each step
 2. Steps with **no overlapping artifacts** can run in parallel (same phase)
@@ -63,7 +63,7 @@ For each phase:
 
 After all phases complete, verify the work hangs together (code compiles conceptually, generated code matches schema changes, tests cover new logic) and report results.
 
-Do NOT report completion until the Coder confirms the local CI-parity gates in `.github/copilot-instructions.md` have passed: the strict clang build (`-DXMLJSON_WARNINGS_AS_ERRORS=ON`), `ctest`, and `cppcheck`. If any gate was not run, send the work back to the Coder rather than reporting done.
+Do NOT report completion until the Coder confirms the local CI-parity gates in `.github/copilot-instructions.md` have passed: the Conan install, the strict clang build (`-DXMLJSON_WARNINGS_AS_ERRORS=ON`), `ctest`, `cppcheck`, and — when build inputs, dependencies, or runtime config changed — the `docker build` check. If any gate was not run, send the work back to the Coder rather than reporting done.
 
 ## Parallelization Rules
 

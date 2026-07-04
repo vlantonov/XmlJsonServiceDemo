@@ -5,7 +5,7 @@ model: GPT-5.3-Codex (copilot)
 tools: [vscode, execute, read, agent, context7/*, github/*, edit, search, web, vscode/memory, todo]
 ---
 
-ALWAYS use #context7 to check current API documentation for any library, framework, build system, or language feature involved — gRPC-C++, protobuf, gtest/gmock, librdkafka or cppkafka, or CMake. Never assume you know the current answer just because the technology is familiar; your training data is in the past and these APIs change frequently, especially gRPC-C++ and protobuf across major versions.
+ALWAYS use #context7 to check current API documentation for any library, framework, build system, package manager, or language feature involved — gRPC-C++, protobuf, gtest/gmock, librdkafka or cppkafka, CMake, Conan, or Docker. Never assume you know the current answer just because the technology is familiar; your training data is in the past and these APIs change frequently, especially gRPC-C++ and protobuf across major versions, and Conan (v1 vs v2) generators and CMake integration.
 
 ## Mandatory Coding Principles (C++)
 
@@ -19,7 +19,14 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - Each logical component gets its own CMake target (library or executable); avoid one monolithic target per repo.
 - Public headers go in `include/`; private implementation headers stay colocated with their `.cpp` files — don't leak internals into the public surface.
-- Before adding a new external dependency, check whether an existing dependency already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
+- Manage external dependencies with the **Conan** package manager: declare each one with a pinned version in the repo's `conanfile` (`conanfile.py`/`conanfile.txt`) and consume it in CMake via the generated `conan_toolchain.cmake` (`CMakeToolchain`) and `CMakeDeps` `find_package` targets. Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep the `conanfile` and the CMake target wiring in sync.
+- Before adding a new external dependency, check whether one already available on Conan Center and already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
+
+10. Packaging and Containers
+
+- The application ships as a Docker image. Keep the **multi-stage `Dockerfile`** working: a build stage that runs `conan install` + the strict CMake build, and a slim runtime stage that copies only the `xmljson-service` binary and its runtime config. Maintain the `.dockerignore` (exclude `build/`, VCS metadata, local Conan caches).
+- Prefer a pinned base image and a non-root runtime user; keep the exposed port and any `docker-compose.yml` in sync with config and CLI changes.
+- When a change touches build inputs, dependencies, or runtime config, update the Docker setup accordingly and verify the image still builds and the container starts.
 
 3. API and Header Design
 
@@ -63,11 +70,14 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 A change is NOT done until the gates in `.github/copilot-instructions.md` pass
 locally. Run them before reporting completion — they mirror the gating CI jobs:
 
-1. **Strict build with clang** (clang is the strictest compiler in the matrix
-   and catches warnings GCC misses, e.g. `-Wunused-lambda-capture`):
+1. **Install deps with Conan, then strict build with clang** (clang is the
+   strictest compiler in the matrix and catches warnings GCC misses, e.g.
+   `-Wunused-lambda-capture`):
 
    ```bash
+   conan install . --output-folder=build --build=missing -s build_type=Release
    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+     -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake \
      -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
    cmake --build build
    ```
@@ -82,6 +92,13 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    ```bash
    cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
      --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests
+   ```
+
+4. **Docker (when build inputs, dependencies, or runtime config changed)**:
+   verify the image builds and the container starts:
+
+   ```bash
+   docker build -t xmljson-service .
    ```
 
 For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,
