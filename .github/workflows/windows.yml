@@ -18,21 +18,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache FetchContent dependencies
+      - name: Install Conan
+        run: pip install "conan>=2.0,<3"
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Cache Conan packages
         uses: actions/cache@v4
         with:
-          path: build/_deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          path: ~/.conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt') }}
+          restore-keys: ${{ runner.os }}-conan-
 
+      - name: Install dependencies
+        shell: bash
+        run: mkdir -p build && cd build && conan install .. --build=missing -pr:b=default -s build_type=Release
+
+      # On Windows, cmake_layout uses a multi-config generator (Visual Studio).
+      # Generators land in build/generators/ (no build_type subdirectory).
+      # Keep WARNINGS_AS_ERRORS=OFF to avoid MSVC warning noise from third-party headers.
       - name: Configure
-        # Keep this OFF on MSVC to avoid warning noise from third-party test dependencies.
         run: |
-          cmake -S . -B build -DXMLJSON_WARNINGS_AS_ERRORS=OFF
+          cmake -S . -B build `
+            -DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake `
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+            -DXMLJSON_WARNINGS_AS_ERRORS=OFF
 
       - name: Build
-        run: |
-          cmake --build build --config Release
+        run: cmake --build build --config Release
 
       - name: Test
-        run: |
-          ctest --test-dir build --output-on-failure -C Release
+        run: ctest --test-dir build --output-on-failure -C Release

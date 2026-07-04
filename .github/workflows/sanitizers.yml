@@ -28,16 +28,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clang and Ninja
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang
+          sudo apt-get install -y cmake make clang
 
-      - name: Cache FetchContent dependencies
+      - name: Install Conan
+        run: pip install "conan>=2.0,<3"
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Cache Conan packages
         uses: actions/cache@v4
         with:
-          path: build/_deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          path: ~/.conan2/p
+          key: ${{ runner.os }}-conan-relwithdebinfo-${{ hashFiles('conanfile.txt') }}
+          restore-keys: ${{ runner.os }}-conan-relwithdebinfo-
+
+      - name: Install dependencies
+        run: mkdir -p build && cd build && conan install .. --build=missing -pr:b=default -s build_type=RelWithDebInfo
 
       - name: Configure
         run: |
@@ -46,12 +56,16 @@ jobs:
           else
             SANITIZER_FLAG="-DXMLJSON_ENABLE_UBSAN=ON"
           fi
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DXMLJSON_WARNINGS_AS_ERRORS=ON "$SANITIZER_FLAG"
+          cmake -S . -B build/RelWithDebInfo \
+            -DCMAKE_TOOLCHAIN_FILE=build/RelWithDebInfo/generators/conan_toolchain.cmake \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DXMLJSON_WARNINGS_AS_ERRORS=ON \
+            "$SANITIZER_FLAG"
 
       - name: Build
-        run: |
-          cmake --build build
+        run: cmake --build build/RelWithDebInfo
 
       - name: Test
-        run: |
-          ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build/RelWithDebInfo --output-on-failure

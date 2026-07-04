@@ -19,30 +19,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clang-tidy and build tools
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build clang clang-tidy
+          sudo apt-get install -y cmake make clang clang-tidy
 
-      - name: Cache FetchContent dependencies
+      - name: Install Conan
+        run: pip install "conan>=2.0,<3"
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Cache Conan packages
         uses: actions/cache@v4
         with:
-          path: build/_deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          path: ~/.conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt') }}
+          restore-keys: ${{ runner.os }}-conan-
+
+      - name: Install dependencies
+        run: mkdir -p build && cd build && conan install .. --build=missing -pr:b=default -s build_type=Release
 
       - name: Configure with compile commands
-        env:
-          CC: clang
-          CXX: clang++
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -S . -B build/Release \
+            -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DXMLJSON_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Run clang-tidy on project sources
         run: |
           if [ -f .clang-tidy ]; then
-            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build
+            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build/Release
           else
-            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build -checks='-*,modernize-*,readability-*,bugprone-*,clang-analyzer-*,-modernize-use-trailing-return-type,-readability-magic-numbers,-readability-identifier-length'
+            clang-tidy lib/src/*.cpp app/main.cpp tests/*.cpp -p build/Release -checks='-*,modernize-*,readability-*,bugprone-*,clang-analyzer-*,-modernize-use-trailing-return-type,-readability-magic-numbers,-readability-identifier-length'
           fi
 
   cppcheck:
@@ -58,12 +71,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cppcheck
-
-      - name: Cache FetchContent dependencies
-        uses: actions/cache@v4
-        with:
-          path: build/_deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
 
       - name: Run cppcheck
         run: |
