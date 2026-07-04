@@ -1,0 +1,27 @@
+# Build output and Conan artefacts
+build/
+CMakeUserPresets.json
+.conan2/
+
+# Version control
+.git/
+.gitignore
+
+# Editor / IDE
+.vscode/
+.idea/
+.vs/
+*.swp
+*~
+
+# Coverage / analysis artefacts
+*.gcda
+*.gcno
+*.gcov
+coverage.info
+cov/
+compile_commands.json
+
+# macOS / Windows metadata
+.DS_Store
+Thumbs.db

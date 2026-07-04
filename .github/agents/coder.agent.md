@@ -5,7 +5,7 @@ model: GPT-5.3-Codex (copilot)
 tools: [vscode, execute, read, agent, context7/*, github/*, edit, search, web, vscode/memory, todo]
 ---
 
-ALWAYS use #context7 to check current API documentation for any library, framework, build system, or language feature involved — gRPC-C++, protobuf, gtest/gmock, librdkafka or cppkafka, or CMake. Never assume you know the current answer just because the technology is familiar; your training data is in the past and these APIs change frequently, especially gRPC-C++ and protobuf across major versions.
+ALWAYS use #context7 to check current API documentation for any library, framework, build system, package manager, or language feature involved — gRPC-C++, protobuf, gtest/gmock, librdkafka or cppkafka, CMake, Conan, or Docker. Never assume you know the current answer just because the technology is familiar; your training data is in the past and these APIs change frequently, especially gRPC-C++ and protobuf across major versions, and Conan (v1 vs v2) generators and CMake integration.
 
 ## Mandatory Coding Principles (C++)
 
@@ -19,7 +19,42 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - Each logical component gets its own CMake target (library or executable); avoid one monolithic target per repo.
 - Public headers go in `include/`; private implementation headers stay colocated with their `.cpp` files — don't leak internals into the public surface.
-- Before adding a new external dependency, check whether an existing dependency already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
+- Manage external dependencies with the **Conan** package manager (>= 2.0): declare each one with a pinned version in the repo's root **`conanfile.txt`** (`[requires]`, `CMakeDeps` + `CMakeToolchain` generators, `cmake_layout`), following the portfolio reference at [KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka). Consume packages in CMake via the generated `find_package` targets and configure through the generated preset (`cmake --preset conan-release`). Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep `conanfile.txt` and the CMake target wiring in sync.
+- Before adding a new external dependency, check whether one already available on Conan Center and already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
+
+10. Packaging and Containers
+
+- The application ships as a Docker image. Keep the **multi-stage `Dockerfile`**
+  working. Key constraints verified against the actual build:
+  - The **build stage** (`ubuntu:24.04`) needs `cmake make gcc g++ ninja-build clang`
+    installed via apt. Install Conan 2 in an isolated venv
+    (`python3 -m venv /opt/conan-venv && pip install "conan>=2.0,<3"`).
+  - Run `conan install` with the **auto-detected profile** (gcc on Ubuntu) for
+    dependency builds. Clang is applied only to the project's own CMake step via
+    `-DCMAKE_CXX_COMPILER=clang++`.
+  - Configure with the **explicit toolchain file** path — **not** `cmake --preset`:
+    ```
+    cmake /src -G "Unix Makefiles" -B /src/build/Release \
+      -DCMAKE_TOOLCHAIN_FILE=/src/build/Release/generators/conan_toolchain.cmake \
+      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_COMPILER=clang++ -DXMLJSON_WARNINGS_AS_ERRORS=ON \
+      -DXMLJSON_BUILD_TESTS=OFF
+    ```
+    `cmake --preset conan-release` is unreliable in containers: Conan only
+    generates `CMakeUserPresets.json` when it can detect CMake at install time.
+  - Copy `conanfile.txt` before copying source so the Conan dep layer is cached
+    separately and only invalidated when `conanfile.txt` changes.
+  - The **runtime stage** copies only `xmljson-service` and `config/default.json`,
+    runs as a non-root user (`xmljson`), and exposes port `8080`.
+- Maintain `.dockerignore` (exclude `build/`, `CMakeUserPresets.json`, VCS, Conan
+  caches) to keep the build context small and reproducible.
+- When a change touches build inputs, dependencies, or runtime config, verify:
+  ```bash
+  docker build -t xmljson-service .
+  docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
+  curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
+  docker stop xmljson-test
+  ```
 
 3. API and Header Design
 
@@ -63,13 +98,17 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 A change is NOT done until the gates in `.github/copilot-instructions.md` pass
 locally. Run them before reporting completion — they mirror the gating CI jobs:
 
-1. **Strict build with clang** (clang is the strictest compiler in the matrix
-   and catches warnings GCC misses, e.g. `-Wunused-lambda-capture`):
+1. **Install deps with Conan, then strict build with clang** (clang is the
+   strictest compiler in the matrix and catches warnings GCC misses, e.g.
+   `-Wunused-lambda-capture`). Requires Conan >= 2.0 and CMake >= 3.21:
 
    ```bash
-   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+   mkdir -p build && cd build
+   conan install .. --build=missing -pr:b=default -s build_type=Release
+   cd ..
+   cmake --preset conan-release \
      -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-   cmake --build build
+   cmake --build build/Release
    ```
 
    `XMLJSON_WARNINGS_AS_ERRORS` defaults to OFF — always pass it `ON`, or CI will
@@ -82,6 +121,16 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    ```bash
    cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
      --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests
+   ```
+
+4. **Docker (when build inputs, dependencies, or runtime config changed)**:
+   build the image and smoke-test the running container:
+
+   ```bash
+   docker build -t xmljson-service .
+   docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
+   curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
+   docker stop xmljson-test
    ```
 
 For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,

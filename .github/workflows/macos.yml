@@ -18,24 +18,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Ninja
-        run: |
-          brew install ninja
+      - name: Install Conan
+        run: pip3 install "conan>=2.0,<3"
 
-      - name: Cache FetchContent dependencies
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Cache Conan packages
         uses: actions/cache@v4
         with:
-          path: build/_deps
-          key: ${{ runner.os }}-deps-${{ hashFiles('cmake/Dependencies.cmake') }}
+          path: ~/.conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt') }}
+          restore-keys: ${{ runner.os }}-conan-
+
+      - name: Install dependencies
+        run: mkdir -p build && cd build && conan install .. --build=missing -pr:b=default -s build_type=Release
 
       - name: Configure
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DXMLJSON_WARNINGS_AS_ERRORS=ON
+          cmake -S . -B build/Release \
+            -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DXMLJSON_WARNINGS_AS_ERRORS=ON
 
       - name: Build
-        run: |
-          cmake --build build
+        run: cmake --build build/Release
 
       - name: Test
-        run: |
-          ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build/Release --output-on-failure
