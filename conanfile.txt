@@ -1,0 +1,15 @@
+[requires]
+nlohmann_json/3.11.3
+pugixml/1.14
+spdlog/1.14.1
+cpp-httplib/0.16.0
+
+[test_requires]
+gtest/1.14.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

@@ -75,7 +75,9 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    `-Wunused-lambda-capture`). Requires Conan >= 2.0 and CMake >= 3.21:
 
    ```bash
-   conan install . --output-folder=build --build=missing -pr:b=default -s build_type=Release
+   mkdir -p build && cd build
+   conan install .. --build=missing -pr:b=default -s build_type=Release
+   cd ..
    cmake --preset conan-release \
      -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
    cmake --build build/Release
