@@ -93,18 +93,44 @@ follows the portfolio reference in
 The service ships as a container image. Any change that affects how the app is
 built, configured, or run must keep the Docker setup working.
 
-- Maintain a **multi-stage `Dockerfile`**: a build stage that runs
-  `conan install` + the strict CMake build (via the `conan-release` preset), and
-  a slim runtime stage that copies only the resulting `xmljson-service` binary
-  and its runtime config (`config/default.json`).
-- Keep a `.dockerignore` that excludes `build/`, VCS metadata, and local Conan
-  caches so build context stays small and reproducible.
-- Prefer a pinned base image and a non-root runtime user; expose the service
-  port and document it. Provide a `docker-compose.yml` when the app needs to be
-  run together with its config for local verification.
+- Maintain a **multi-stage `Dockerfile`** with two stages:
+  - **`build` stage** (`ubuntu:24.04`): install system packages (`cmake make gcc
+    g++ ninja-build clang`), install Conan 2 in an isolated venv
+    (`python3 -m venv /opt/conan-venv`), run `conan install` with the
+    auto-detected profile (gcc — reliable on Ubuntu; clang is applied only to
+    the project's own CMake step), then configure with the **explicit toolchain
+    file** path and build only the `xmljson-service` target:
+    ```dockerfile
+    RUN cmake /src \
+            -G "Unix Makefiles" \
+            -B /src/build/Release \
+            -DCMAKE_TOOLCHAIN_FILE=/src/build/Release/generators/conan_toolchain.cmake \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DXMLJSON_WARNINGS_AS_ERRORS=ON \
+            -DXMLJSON_BUILD_TESTS=OFF \
+        && cmake --build build/Release --target xmljson-service
+    ```
+    **Do not use `cmake --preset conan-release` in Docker** — Conan only
+    generates `CMakeUserPresets.json` when it can detect CMake at install time,
+    which is not guaranteed in all container environments. Use the explicit
+    `-DCMAKE_TOOLCHAIN_FILE` path instead.
+  - **`runtime` stage** (`ubuntu:24.04`): copies only `xmljson-service` and
+    `config/default.json`, runs as a non-root `xmljson` user, exposes port
+    `8080`.
+- Copy `conanfile.txt` **before** the source tree so that the Conan dependency
+  layer is cached separately and only invalidated when dependencies change.
+- Keep a `.dockerignore` that excludes `build/`, `CMakeUserPresets.json`, VCS
+  metadata, and local Conan caches so the build context stays small.
 - After a change that touches build inputs, dependencies, or runtime config,
-  verify the image builds (`docker build -t xmljson-service .`) and the container
-  starts before reporting the work done.
+  verify the image builds and the container starts and responds:
+  ```bash
+  docker build -t xmljson-service .
+  docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
+  curl -s http://localhost:18080/healthz   # expect {"status":"ok"}
+  docker stop xmljson-test
+  ```
 
 
 

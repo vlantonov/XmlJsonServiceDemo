@@ -21,7 +21,7 @@ You create plans. You do NOT write code.
    - Error handling across process/service boundaries (gRPC calls, Kafka message handling)
    - Threading/concurrency model the new code must fit into
    - Dependency management: any new third-party library must be declared in the root `conanfile.txt` (pinned version, `CMakeDeps`/`CMakeToolchain`, `cmake_layout`) and wired into CMake via the generated Conan preset — not `FetchContent` or hand-vendored
-   - Packaging: whether the change affects the multi-stage `Dockerfile`, `.dockerignore`, or `docker-compose.yml` (new build inputs, runtime config, exposed ports, or dependencies)
+   - Packaging: whether the change affects the multi-stage `Dockerfile`, `.dockerignore`, or `docker-compose.yml`. Key Docker-specific constraints: the build stage requires `make gcc g++` in addition to `clang` (Conan builds deps with gcc on Ubuntu); use the explicit `-DCMAKE_TOOLCHAIN_FILE` path in `cmake`, not `--preset conan-release` (the preset file is not reliably generated in container environments); copy `conanfile.txt` before source files to preserve the Conan dep cache layer.
 5. **Plan**: Output WHAT needs to happen, with artifact assignments and sequencing constraints — not HOW to code it.
 
 ## Output
@@ -30,7 +30,7 @@ You create plans. You do NOT write code.
 - Implementation steps (ordered), each tagged with the artifacts touched (files, CMake targets, or schema definitions)
 - Sequencing constraints (e.g., "step 3 requires step 1's generated protobuf code to exist")
 - Edge cases to handle
-- **Verification step** (always last): the local gates the Coder must pass before the work is done — the Conan install, the strict clang build, `ctest`, `cppcheck`, and (when build inputs, dependencies, or runtime config changed) the `docker build` check from `.github/copilot-instructions.md`. Never omit this step.
+- **Verification step** (always last): the local gates the Coder must pass before the work is done — the Conan install, the strict clang build, `ctest`, `cppcheck`, and (when build inputs, dependencies, or runtime config changed) `docker build` + `curl /healthz` smoke-test from `.github/copilot-instructions.md`. Never omit this step.
 - Open questions (if any)
 
 ## Rules

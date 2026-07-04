@@ -24,9 +24,37 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 10. Packaging and Containers
 
-- The application ships as a Docker image. Keep the **multi-stage `Dockerfile`** working: a build stage that runs `conan install` + the strict CMake build, and a slim runtime stage that copies only the `xmljson-service` binary and its runtime config. Maintain the `.dockerignore` (exclude `build/`, VCS metadata, local Conan caches).
-- Prefer a pinned base image and a non-root runtime user; keep the exposed port and any `docker-compose.yml` in sync with config and CLI changes.
-- When a change touches build inputs, dependencies, or runtime config, update the Docker setup accordingly and verify the image still builds and the container starts.
+- The application ships as a Docker image. Keep the **multi-stage `Dockerfile`**
+  working. Key constraints verified against the actual build:
+  - The **build stage** (`ubuntu:24.04`) needs `cmake make gcc g++ ninja-build clang`
+    installed via apt. Install Conan 2 in an isolated venv
+    (`python3 -m venv /opt/conan-venv && pip install "conan>=2.0,<3"`).
+  - Run `conan install` with the **auto-detected profile** (gcc on Ubuntu) for
+    dependency builds. Clang is applied only to the project's own CMake step via
+    `-DCMAKE_CXX_COMPILER=clang++`.
+  - Configure with the **explicit toolchain file** path — **not** `cmake --preset`:
+    ```
+    cmake /src -G "Unix Makefiles" -B /src/build/Release \
+      -DCMAKE_TOOLCHAIN_FILE=/src/build/Release/generators/conan_toolchain.cmake \
+      -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_COMPILER=clang++ -DXMLJSON_WARNINGS_AS_ERRORS=ON \
+      -DXMLJSON_BUILD_TESTS=OFF
+    ```
+    `cmake --preset conan-release` is unreliable in containers: Conan only
+    generates `CMakeUserPresets.json` when it can detect CMake at install time.
+  - Copy `conanfile.txt` before copying source so the Conan dep layer is cached
+    separately and only invalidated when `conanfile.txt` changes.
+  - The **runtime stage** copies only `xmljson-service` and `config/default.json`,
+    runs as a non-root user (`xmljson`), and exposes port `8080`.
+- Maintain `.dockerignore` (exclude `build/`, `CMakeUserPresets.json`, VCS, Conan
+  caches) to keep the build context small and reproducible.
+- When a change touches build inputs, dependencies, or runtime config, verify:
+  ```bash
+  docker build -t xmljson-service .
+  docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
+  curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
+  docker stop xmljson-test
+  ```
 
 3. API and Header Design
 
@@ -96,10 +124,13 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    ```
 
 4. **Docker (when build inputs, dependencies, or runtime config changed)**:
-   verify the image builds and the container starts:
+   build the image and smoke-test the running container:
 
    ```bash
    docker build -t xmljson-service .
+   docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
+   curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
+   docker stop xmljson-test
    ```
 
 For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,
