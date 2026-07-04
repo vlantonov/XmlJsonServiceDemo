@@ -11,24 +11,25 @@ mirror the gating CI jobs exactly — run them before reporting work as done.
 Use **clang** for the build gate: it is the strictest compiler in the matrix and
 catches warnings GCC does not (e.g. `-Wunused-lambda-capture`).
 
-1. **Install dependencies with Conan**, then **strict build** (matches
-   `.github/workflows/ubuntu.yml`):
+Prerequisites: **Conan >= 2.0** and **CMake >= 3.21** (preset support).
+
+1. **Install dependencies with Conan**, then **strict build** via the generated
+   CMake preset (matches `.github/workflows/ubuntu.yml`):
 
    ```bash
-   conan install . --output-folder=build --build=missing -s build_type=Release
-   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-     -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake \
+   conan install . --output-folder=build --build=missing -pr:b=default -s build_type=Release
+   cmake --preset conan-release \
      -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-   cmake --build build
+   cmake --build build/Release
    ```
 
-   `XMLJSON_WARNINGS_AS_ERRORS` defaults to **OFF**, so a plain `cmake -B build`
+   `XMLJSON_WARNINGS_AS_ERRORS` defaults to **OFF**, so a plain `cmake --preset`
    will silently hide warnings that CI treats as errors. Always pass it `ON`.
 
 2. **Tests** (matches `.github/workflows/ubuntu.yml`):
 
    ```bash
-   ctest --test-dir build --output-on-failure
+   ctest --test-dir build/Release --output-on-failure
    ```
 
 3. **Static analysis** (matches `.github/workflows/static_check.yml`):
@@ -40,19 +41,46 @@ catches warnings GCC does not (e.g. `-Wunused-lambda-capture`).
 
 ## Dependency management (Conan)
 
-External dependencies are managed with the **Conan** package manager — not
-hand-vendored, and not pulled ad hoc via CMake `FetchContent`.
+External dependencies are managed with the **Conan** package manager (>= 2.0) —
+not hand-vendored, and not pulled ad hoc via CMake `FetchContent`. The setup
+follows the portfolio reference in
+[KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka).
 
-- Declare every third-party dependency in the repo's `conanfile` (`conanfile.py`
-  or `conanfile.txt`) with a pinned version, and consume it in CMake through the
-  generated `conan_toolchain.cmake` (`CMakeToolchain`) and `CMakeDeps` targets.
-  Link against the Conan-provided `find_package` targets (e.g.
-  `nlohmann_json::nlohmann_json`, `pugixml::pugixml`, `spdlog::spdlog`).
+- Declare every third-party dependency in a **`conanfile.txt`** at the repo root
+  with pinned versions, using the `CMakeDeps` + `CMakeToolchain` generators and
+  the `cmake_layout` layout. The file shape mirrors the reference:
+
+  ```ini
+  [requires]
+  nlohmann_json/3.11.3
+  pugixml/1.14
+  spdlog/1.14.1
+  cpp-httplib/0.16.0
+
+  [test_requires]
+  gtest/1.14.0
+
+  [generators]
+  CMakeDeps
+  CMakeToolchain
+
+  [layout]
+  cmake_layout
+  ```
+
+- Consume the packages in CMake through the generated `conan_toolchain.cmake`
+  and `CMakeDeps` `find_package` targets (e.g. `nlohmann_json::nlohmann_json`,
+  `pugixml::pugixml`, `spdlog::spdlog`, `httplib::httplib`, `gtest::gtest`).
+- `cmake_layout` places generated files and build output under `build/<Config>`
+  (e.g. `build/Release`); configure via the generated preset
+  (`cmake --preset conan-release`) rather than a hand-passed toolchain path. For
+  CMake < 3.23 without preset support, fall back to
+  `cmake -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake`.
 - Before adding a new dependency, prefer one already available on Conan Center
   and already used elsewhere in the portfolio.
 - Pin versions explicitly; never float on `latest`. Run `conan install` with
   `--build=missing` so missing binaries are built from source deterministically.
-- Keep the `conanfile` and the CMake target wiring in sync — a dependency added
+- Keep `conanfile.txt` and the CMake target wiring in sync — a dependency added
   to one must appear in the other, or the strict build gate above will fail.
 
 ## Docker (application packaging)
@@ -61,9 +89,9 @@ The service ships as a container image. Any change that affects how the app is
 built, configured, or run must keep the Docker setup working.
 
 - Maintain a **multi-stage `Dockerfile`**: a build stage that runs
-  `conan install` + the strict CMake build, and a slim runtime stage that copies
-  only the resulting `xmljson-service` binary and its runtime config
-  (`config/default.json`).
+  `conan install` + the strict CMake build (via the `conan-release` preset), and
+  a slim runtime stage that copies only the resulting `xmljson-service` binary
+  and its runtime config (`config/default.json`).
 - Keep a `.dockerignore` that excludes `build/`, VCS metadata, and local Conan
   caches so build context stays small and reproducible.
 - Prefer a pinned base image and a non-root runtime user; expose the service

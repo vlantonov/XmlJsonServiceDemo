@@ -25,7 +25,7 @@ Call the Planner agent with the user's request. The Planner will return implemen
 
 ### Step 2: Parse Into Phases
 
-The Planner's response includes **artifact assignments** for each step. An "artifact" is a file, a CMake target, a schema definition (.proto/.avsc) plus the code generated from it, the **Conan `conanfile`** (dependency manifest), OR the **Docker packaging files** (`Dockerfile`, `.dockerignore`, `docker-compose.yml`). Use these to determine parallelization:
+The Planner's response includes **artifact assignments** for each step. An "artifact" is a file, a CMake target, a schema definition (.proto/.avsc) plus the code generated from it, the **Conan `conanfile.txt`** (dependency manifest), OR the **Docker packaging files** (`Dockerfile`, `.dockerignore`, `docker-compose.yml`). Use these to determine parallelization:
 
 1. Extract the artifact list from each step
 2. Steps with **no overlapping artifacts** can run in parallel (same phase)

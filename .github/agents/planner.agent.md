@@ -20,7 +20,7 @@ You create plans. You do NOT write code.
    - Build-time codegen ordering (schema must generate before dependent code compiles)
    - Error handling across process/service boundaries (gRPC calls, Kafka message handling)
    - Threading/concurrency model the new code must fit into
-   - Dependency management: any new third-party library must be declared in the `conanfile` with a pinned version and wired into CMake via the Conan toolchain — not `FetchContent` or hand-vendored
+   - Dependency management: any new third-party library must be declared in the root `conanfile.txt` (pinned version, `CMakeDeps`/`CMakeToolchain`, `cmake_layout`) and wired into CMake via the generated Conan preset — not `FetchContent` or hand-vendored
    - Packaging: whether the change affects the multi-stage `Dockerfile`, `.dockerignore`, or `docker-compose.yml` (new build inputs, runtime config, exposed ports, or dependencies)
 5. **Plan**: Output WHAT needs to happen, with artifact assignments and sequencing constraints — not HOW to code it.
 
@@ -36,7 +36,7 @@ You create plans. You do NOT write code.
 ## Rules
 
 - Never skip documentation checks for external APIs, especially gRPC/protobuf/Kafka client libraries, which change across versions
-- Treat dependency changes as Conan changes: flag any step that adds or bumps a dependency as touching both the `conanfile` and the CMake wiring, and note that the two must stay in sync
+- Treat dependency changes as Conan changes: flag any step that adds or bumps a dependency as touching both the root `conanfile.txt` and the CMake wiring, and note that the two must stay in sync
 - Always flag when a step modifies a .proto or .avsc schema — mark every step that depends on its generated code as sequential, never parallel, with that step
 - Match existing codebase patterns in this repo first; fall back to portfolio-wide conventions when this repo doesn't yet have an established pattern
 - Consider what the user needs but didn't ask for

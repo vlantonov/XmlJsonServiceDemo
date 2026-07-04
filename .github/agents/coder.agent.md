@@ -19,7 +19,7 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - Each logical component gets its own CMake target (library or executable); avoid one monolithic target per repo.
 - Public headers go in `include/`; private implementation headers stay colocated with their `.cpp` files — don't leak internals into the public surface.
-- Manage external dependencies with the **Conan** package manager: declare each one with a pinned version in the repo's `conanfile` (`conanfile.py`/`conanfile.txt`) and consume it in CMake via the generated `conan_toolchain.cmake` (`CMakeToolchain`) and `CMakeDeps` `find_package` targets. Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep the `conanfile` and the CMake target wiring in sync.
+- Manage external dependencies with the **Conan** package manager (>= 2.0): declare each one with a pinned version in the repo's root **`conanfile.txt`** (`[requires]`, `CMakeDeps` + `CMakeToolchain` generators, `cmake_layout`), following the portfolio reference at [KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka). Consume packages in CMake via the generated `find_package` targets and configure through the generated preset (`cmake --preset conan-release`). Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep `conanfile.txt` and the CMake target wiring in sync.
 - Before adding a new external dependency, check whether one already available on Conan Center and already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
 
 10. Packaging and Containers
@@ -72,14 +72,13 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
 
 1. **Install deps with Conan, then strict build with clang** (clang is the
    strictest compiler in the matrix and catches warnings GCC misses, e.g.
-   `-Wunused-lambda-capture`):
+   `-Wunused-lambda-capture`). Requires Conan >= 2.0 and CMake >= 3.21:
 
    ```bash
-   conan install . --output-folder=build --build=missing -s build_type=Release
-   cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-     -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake \
+   conan install . --output-folder=build --build=missing -pr:b=default -s build_type=Release
+   cmake --preset conan-release \
      -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-   cmake --build build
+   cmake --build build/Release
    ```
 
    `XMLJSON_WARNINGS_AS_ERRORS` defaults to OFF — always pass it `ON`, or CI will
