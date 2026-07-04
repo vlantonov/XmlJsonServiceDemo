@@ -38,15 +38,20 @@ jobs:
       # On Windows, cmake_layout uses a multi-config generator (Visual Studio).
       # Generators land in build/generators/ (no build_type subdirectory).
       # Keep WARNINGS_AS_ERRORS=OFF to avoid MSVC warning noise from third-party headers.
+      # Use shell: bash throughout to avoid PowerShell backtick line-continuation
+      # splitting cmake arguments (e.g. conan_toolchain.cmake → conan_toolchain + .cmake).
       - name: Configure
+        shell: bash
         run: |
-          cmake -S . -B build `
-            -DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake `
-            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW `
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake \
+            -DCMAKE_POLICY_DEFAULT_CMP0091=NEW \
             -DXMLJSON_WARNINGS_AS_ERRORS=OFF
 
       - name: Build
+        shell: bash
         run: cmake --build build --config Release
 
       - name: Test
+        shell: bash
         run: ctest --test-dir build --output-on-failure -C Release
