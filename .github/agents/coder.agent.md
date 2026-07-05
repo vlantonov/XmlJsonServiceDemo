@@ -25,7 +25,10 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 10. Packaging and Containers
 
 - The application ships as a Docker image. Keep the **multi-stage `Dockerfile`**
-  working. Key constraints verified against the actual build:
+  working. Key constraints verified against the actual build (this repo's concrete
+  names — service binary, runtime config path, non-root user, exposed port, and
+  health endpoint — are defined in `.github/copilot-instructions.md`; below,
+  `<PROJECT>` is the CMake option prefix and `<image>` the image name):
   - The **build stage** (`ubuntu:24.04`) needs `cmake make gcc g++ ninja-build clang`
     installed via apt. Install Conan 2 in an isolated venv
     (`python3 -m venv /opt/conan-venv && pip install "conan>=2.0,<3"`).
@@ -37,23 +40,24 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
     cmake /src -G "Unix Makefiles" -B /src/build/Release \
       -DCMAKE_TOOLCHAIN_FILE=/src/build/Release/generators/conan_toolchain.cmake \
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_CXX_COMPILER=clang++ -DXMLJSON_WARNINGS_AS_ERRORS=ON \
-      -DXMLJSON_BUILD_TESTS=OFF
+      -DCMAKE_CXX_COMPILER=clang++ -D<PROJECT>_WARNINGS_AS_ERRORS=ON \
+      -D<PROJECT>_BUILD_TESTS=OFF
     ```
     `cmake --preset conan-release` is unreliable in containers: Conan only
     generates `CMakeUserPresets.json` when it can detect CMake at install time.
   - Copy `conanfile.txt` before copying source so the Conan dep layer is cached
     separately and only invalidated when `conanfile.txt` changes.
-  - The **runtime stage** copies only `xmljson-service` and `config/default.json`,
-    runs as a non-root user (`xmljson`), and exposes port `8080`.
+  - The **runtime stage** copies only the service binary and its runtime config,
+    runs as a non-root user, and exposes the service port.
 - Maintain `.dockerignore` (exclude `build/`, `CMakeUserPresets.json`, VCS, Conan
   caches) to keep the build context small and reproducible.
-- When a change touches build inputs, dependencies, or runtime config, verify:
+- When a change touches build inputs, dependencies, or runtime config, verify the
+  image builds and the running container answers its health endpoint:
   ```bash
-  docker build -t xmljson-service .
-  docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
-  curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
-  docker stop xmljson-test
+  docker build -t <image> .
+  docker run --rm -d --name <image>-test -p <host-port>:<port> <image>
+  curl -s http://localhost:<host-port>/healthz   # must return the healthy response
+  docker stop <image>-test
   ```
 
 3. API and Header Design
@@ -96,7 +100,10 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 ## Verification (Definition of Done)
 
 A change is NOT done until the gates in `.github/copilot-instructions.md` pass
-locally. Run them before reporting completion — they mirror the gating CI jobs:
+locally. Run them before reporting completion — they mirror the gating CI jobs.
+That file defines this repo's concrete values (the `<PROJECT>` CMake option
+prefix, the public-include and source dirs, and the `<image>`/port names); the
+shape of each gate is:
 
 1. **Install deps with Conan, then strict build with clang** (clang is the
    strictest compiler in the matrix and catches warnings GCC misses, e.g.
@@ -107,30 +114,30 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    conan install .. --build=missing -pr:b=default -s build_type=Release
    cd ..
    cmake --preset conan-release \
-     -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+     -D<PROJECT>_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
    cmake --build build/Release
    ```
 
-   `XMLJSON_WARNINGS_AS_ERRORS` defaults to OFF — always pass it `ON`, or CI will
+   The warnings-as-errors option defaults to OFF — always pass it `ON`, or CI will
    fail on warnings your local build silently hid.
 
-2. **Tests**: `ctest --test-dir build --output-on-failure`
+2. **Tests**: `ctest --test-dir build/Release --output-on-failure`
 
 3. **Static analysis**:
 
    ```bash
    cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
-     --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests
+     --suppress=missingIncludeSystem --inline-suppr -I <public-include-dirs> <source-dirs>
    ```
 
 4. **Docker (when build inputs, dependencies, or runtime config changed)**:
    build the image and smoke-test the running container:
 
    ```bash
-   docker build -t xmljson-service .
-   docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
-   curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
-   docker stop xmljson-test
+   docker build -t <image> .
+   docker run --rm -d --name <image>-test -p <host-port>:<port> <image>
+   curl -s http://localhost:<host-port>/healthz   # must return the healthy response
+   docker stop <image>-test
    ```
 
 For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,
