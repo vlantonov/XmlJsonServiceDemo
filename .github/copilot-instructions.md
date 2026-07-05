@@ -44,13 +44,14 @@ Prerequisites: **Conan >= 2.0** and **CMake >= 3.21** (preset support).
 ## Dependency management (Conan)
 
 External dependencies are managed with the **Conan** package manager (>= 2.0) —
-not hand-vendored, and not pulled ad hoc via CMake `FetchContent`. The setup
-follows the portfolio reference in
-[KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka).
+not hand-vendored, and not pulled ad hoc via CMake `FetchContent`.
 
 - Declare every third-party dependency in a **`conanfile.txt`** at the repo root
   with pinned versions, using the `CMakeDeps` + `CMakeToolchain` generators and
-  the `cmake_layout` layout. The file shape mirrors the reference:
+  the `cmake_layout` layout. The file is organized into blocks: a `[requires]`
+  block of pinned `name/version` runtime dependencies, a `[test_requires]` block
+  for test-only dependencies, a `[generators]` block listing `CMakeDeps` and
+  `CMakeToolchain`, and a `[layout]` block set to `cmake_layout`:
 
   ```ini
   [requires]
