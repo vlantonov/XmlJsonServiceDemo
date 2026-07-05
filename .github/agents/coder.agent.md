@@ -76,7 +76,7 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - New logic gets gtest coverage in the existing test directory structure.
 - Tests verify observable behavior, not implementation details.
-- Match this portfolio's existing CI conventions (multi-OS matrix, sanitizers, CodeQL) — see CascadeClassifier's CI setup as the reference point — rather than introducing a new CI style per repo.
+- Match this repo's existing CI conventions as the guideline rather than introducing a new CI style: a multi-OS build/test matrix across separate workflows — Ubuntu (`gcc` + `clang` matrix) in `.github/workflows/ubuntu.yml`, macOS in `macos.yml`, Windows/MSVC in `windows.yml` — plus a sanitizer matrix (ASan + UBSan) in `sanitizers.yml` and static analysis (clang-tidy + cppcheck) in `static_check.yml`.
 
 7. Regenerability
 
