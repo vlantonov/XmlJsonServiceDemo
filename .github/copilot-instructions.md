@@ -5,8 +5,9 @@ files under `.github/agents/` build on top of this; this file always applies.
 
 ## Definition of Done (C++ changes)
 
-A C++ change is **not complete** until all of the following pass locally. These
-mirror the gating CI jobs exactly — run them before reporting work as done.
+A C++ change is **not complete** until all of the following pass locally. Items
+1–2 mirror the gating CI jobs exactly; item 3 is a local pre-flight for the
+advisory `cppcheck` job — run all three before reporting work as done.
 
 Use **clang** for the build gate: it is the strictest compiler in the matrix and
 catches warnings GCC does not (e.g. `-Wunused-lambda-capture`).
@@ -33,6 +34,8 @@ Prerequisites: **Conan >= 2.0** and **CMake >= 3.21** (preset support).
    ```bash
    ctest --test-dir build/Release --output-on-failure
    ```
+
+### Advisory local checks (not gating in CI, but expected to pass)
 
 3. **Static analysis** (matches `.github/workflows/static_check.yml`):
 
