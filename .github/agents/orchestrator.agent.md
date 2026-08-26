@@ -63,7 +63,7 @@ For each phase:
 
 After all phases complete, verify the work hangs together (code compiles conceptually, generated code matches schema changes, tests cover new logic) and report results.
 
-Do NOT report completion until the Coder confirms the local CI-parity gates in `.github/copilot-instructions.md` have passed: the Conan install, the strict clang build (`-DXMLJSON_WARNINGS_AS_ERRORS=ON`), `ctest`, `cppcheck`, and — when build inputs, dependencies, or runtime config changed — the `docker build` + `curl /healthz` smoke-test. If any gate was not run, send the work back to the Coder rather than reporting done.
+Do NOT report completion until the Coder confirms the local CI-parity gates in `.github/copilot-instructions.md` have passed: the Conan install, the strict clang build (`-D<PROJECT>_WARNINGS_AS_ERRORS=ON`, where `<PROJECT>` is the repo's CMake option prefix), `ctest`, `cppcheck`, and — when build inputs, dependencies, or runtime config changed — the `docker build` + `curl /healthz` smoke-test. If any gate was not run, send the work back to the Coder rather than reporting done.
 
 ## Parallelization Rules
 

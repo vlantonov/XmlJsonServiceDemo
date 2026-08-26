@@ -19,13 +19,16 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - Each logical component gets its own CMake target (library or executable); avoid one monolithic target per repo.
 - Public headers go in `include/`; private implementation headers stay colocated with their `.cpp` files — don't leak internals into the public surface.
-- Manage external dependencies with the **Conan** package manager (>= 2.0): declare each one with a pinned version in the repo's root **`conanfile.txt`** (`[requires]`, `CMakeDeps` + `CMakeToolchain` generators, `cmake_layout`), following the portfolio reference at [KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka). Consume packages in CMake via the generated `find_package` targets and configure through the generated preset (`cmake --preset conan-release`). Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep `conanfile.txt` and the CMake target wiring in sync.
-- Before adding a new external dependency, check whether one already available on Conan Center and already used elsewhere in the portfolio (e.g. in CascadeClassifier) covers the need.
+- Manage external dependencies with the **Conan** package manager (>= 2.0). Declare each dependency with a pinned version in the repo's root **`conanfile.txt`**, structured in three blocks: a `[requires]` block listing pinned `name/version` entries, a `[generators]` block with `CMakeDeps` and `CMakeToolchain`, and a `[layout]` block set to `cmake_layout`. Consume packages in CMake with `find_package(<Package> REQUIRED)` and link the namespaced imported target (`target_link_libraries(<target> PRIVATE <Namespace>::<lib>)`); set the language level per target via `set_target_properties(<target> PROPERTIES CXX_STANDARD <N> CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)` rather than relying on a global default. Install and configure from a `build/` dir: `conan install .. --build=missing -pr:b=default -s build_type=Release`, then the generated preset `cmake --preset conan-release`; for CMake < 3.23 without preset support, fall back to `-DCMAKE_TOOLCHAIN_FILE=generators/conan_toolchain.cmake`. Do not hand-vendor sources or add ad hoc `FetchContent` for new dependencies. Keep `conanfile.txt` and the CMake target wiring in sync.
+- Before adding a new external dependency, check whether one already available on Conan Center covers the need.
 
 10. Packaging and Containers
 
 - The application ships as a Docker image. Keep the **multi-stage `Dockerfile`**
-  working. Key constraints verified against the actual build:
+  working. Key constraints verified against the actual build (this repo's concrete
+  names — service binary, runtime config path, non-root user, exposed port, and
+  health endpoint — are defined in `.github/copilot-instructions.md`; below,
+  `<PROJECT>` is the CMake option prefix and `<image>` the image name):
   - The **build stage** (`ubuntu:24.04`) needs `cmake make gcc g++ ninja-build clang`
     installed via apt. Install Conan 2 in an isolated venv
     (`python3 -m venv /opt/conan-venv && pip install "conan>=2.0,<3"`).
@@ -37,23 +40,24 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
     cmake /src -G "Unix Makefiles" -B /src/build/Release \
       -DCMAKE_TOOLCHAIN_FILE=/src/build/Release/generators/conan_toolchain.cmake \
       -DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_CXX_COMPILER=clang++ -DXMLJSON_WARNINGS_AS_ERRORS=ON \
-      -DXMLJSON_BUILD_TESTS=OFF
+      -DCMAKE_CXX_COMPILER=clang++ -D<PROJECT>_WARNINGS_AS_ERRORS=ON \
+      -D<PROJECT>_BUILD_TESTS=OFF
     ```
     `cmake --preset conan-release` is unreliable in containers: Conan only
     generates `CMakeUserPresets.json` when it can detect CMake at install time.
   - Copy `conanfile.txt` before copying source so the Conan dep layer is cached
     separately and only invalidated when `conanfile.txt` changes.
-  - The **runtime stage** copies only `xmljson-service` and `config/default.json`,
-    runs as a non-root user (`xmljson`), and exposes port `8080`.
+  - The **runtime stage** copies only the service binary and its runtime config,
+    runs as a non-root user, and exposes the service port.
 - Maintain `.dockerignore` (exclude `build/`, `CMakeUserPresets.json`, VCS, Conan
   caches) to keep the build context small and reproducible.
-- When a change touches build inputs, dependencies, or runtime config, verify:
+- When a change touches build inputs, dependencies, or runtime config, verify the
+  image builds and the running container answers its health endpoint:
   ```bash
-  docker build -t xmljson-service .
-  docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
-  curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
-  docker stop xmljson-test
+  docker build -t <image> .
+  docker run --rm -d --name <image>-test -p <host-port>:<port> <image>
+  curl -s http://localhost:<host-port>/healthz   # must return the healthy response
+  docker stop <image>-test
   ```
 
 3. API and Header Design
@@ -76,7 +80,7 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 
 - New logic gets gtest coverage in the existing test directory structure.
 - Tests verify observable behavior, not implementation details.
-- Match this portfolio's existing CI conventions (multi-OS matrix, sanitizers, CodeQL) — see CascadeClassifier's CI setup as the reference point — rather than introducing a new CI style per repo.
+- Match this repo's existing CI conventions as the guideline rather than introducing a new CI style: a multi-OS build/test matrix across separate workflows — Ubuntu (`gcc` + `clang` matrix) in `.github/workflows/ubuntu.yml`, macOS in `macos.yml`, Windows/MSVC in `windows.yml` — plus a sanitizer matrix (ASan + UBSan) in `sanitizers.yml` and static analysis (clang-tidy + cppcheck) in `static_check.yml`.
 
 7. Regenerability
 
@@ -96,7 +100,10 @@ ALWAYS use #context7 to check current API documentation for any library, framewo
 ## Verification (Definition of Done)
 
 A change is NOT done until the gates in `.github/copilot-instructions.md` pass
-locally. Run them before reporting completion — they mirror the gating CI jobs:
+locally. Run them before reporting completion — they mirror the gating CI jobs.
+That file defines this repo's concrete values (the `<PROJECT>` CMake option
+prefix, the public-include and source dirs, and the `<image>`/port names); the
+shape of each gate is:
 
 1. **Install deps with Conan, then strict build with clang** (clang is the
    strictest compiler in the matrix and catches warnings GCC misses, e.g.
@@ -107,30 +114,30 @@ locally. Run them before reporting completion — they mirror the gating CI jobs
    conan install .. --build=missing -pr:b=default -s build_type=Release
    cd ..
    cmake --preset conan-release \
-     -DXMLJSON_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+     -D<PROJECT>_WARNINGS_AS_ERRORS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
    cmake --build build/Release
    ```
 
-   `XMLJSON_WARNINGS_AS_ERRORS` defaults to OFF — always pass it `ON`, or CI will
+   The warnings-as-errors option defaults to OFF — always pass it `ON`, or CI will
    fail on warnings your local build silently hid.
 
-2. **Tests**: `ctest --test-dir build --output-on-failure`
+2. **Tests**: `ctest --test-dir build/Release --output-on-failure`
 
 3. **Static analysis**:
 
    ```bash
    cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
-     --suppress=missingIncludeSystem --inline-suppr -I lib/include lib/src app tests
+     --suppress=missingIncludeSystem --inline-suppr -I <public-include-dirs> <source-dirs>
    ```
 
 4. **Docker (when build inputs, dependencies, or runtime config changed)**:
    build the image and smoke-test the running container:
 
    ```bash
-   docker build -t xmljson-service .
-   docker run --rm -d --name xmljson-test -p 18080:8080 xmljson-service
-   curl -s http://localhost:18080/healthz   # must return {"status":"ok"}
-   docker stop xmljson-test
+   docker build -t <image> .
+   docker run --rm -d --name <image>-test -p <host-port>:<port> <image>
+   curl -s http://localhost:<host-port>/healthz   # must return the healthy response
+   docker stop <image>-test
    ```
 
 For cppcheck/clang false positives (e.g. `passedByValue` on `std::string_view`,

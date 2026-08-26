@@ -5,8 +5,9 @@ files under `.github/agents/` build on top of this; this file always applies.
 
 ## Definition of Done (C++ changes)
 
-A C++ change is **not complete** until all of the following pass locally. These
-mirror the gating CI jobs exactly — run them before reporting work as done.
+A C++ change is **not complete** until all of the following pass locally. Items
+1–2 mirror the gating CI jobs exactly; item 3 is a local pre-flight for the
+advisory `cppcheck` job — run all three before reporting work as done.
 
 Use **clang** for the build gate: it is the strictest compiler in the matrix and
 catches warnings GCC does not (e.g. `-Wunused-lambda-capture`).
@@ -34,6 +35,8 @@ Prerequisites: **Conan >= 2.0** and **CMake >= 3.21** (preset support).
    ctest --test-dir build/Release --output-on-failure
    ```
 
+### Advisory local checks (not gating in CI, but expected to pass)
+
 3. **Static analysis** (matches `.github/workflows/static_check.yml`):
 
    ```bash
@@ -44,13 +47,14 @@ Prerequisites: **Conan >= 2.0** and **CMake >= 3.21** (preset support).
 ## Dependency management (Conan)
 
 External dependencies are managed with the **Conan** package manager (>= 2.0) —
-not hand-vendored, and not pulled ad hoc via CMake `FetchContent`. The setup
-follows the portfolio reference in
-[KafkaTutorial/cpp/cppkafka](https://github.com/vlantonov/KafkaTutorial/tree/main/cpp/cppkafka).
+not hand-vendored, and not pulled ad hoc via CMake `FetchContent`.
 
 - Declare every third-party dependency in a **`conanfile.txt`** at the repo root
   with pinned versions, using the `CMakeDeps` + `CMakeToolchain` generators and
-  the `cmake_layout` layout. The file shape mirrors the reference:
+  the `cmake_layout` layout. The file is organized into blocks: a `[requires]`
+  block of pinned `name/version` runtime dependencies, a `[test_requires]` block
+  for test-only dependencies, a `[generators]` block listing `CMakeDeps` and
+  `CMakeToolchain`, and a `[layout]` block set to `cmake_layout`:
 
   ```ini
   [requires]

@@ -12,14 +12,18 @@ permissions:
 jobs:
   build-test:
     name: macOS (Apple Clang)
-    runs-on: macos-13
+    # Intentionally tracks the newest macOS runner image; not pinned to macos-13.
+    runs-on: macOS-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Conan
-        run: pip3 install "conan>=2.0,<3"
+        # macos-latest ships an externally-managed Python (PEP 668); use pipx.
+        run: |
+          pipx install "conan>=2.0,<3"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Detect Conan profile
         run: conan profile detect --force
