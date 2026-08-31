@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Conan
         # macos-latest ships an externally-managed Python (PEP 668); use pipx.
