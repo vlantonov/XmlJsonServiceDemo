@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM ubuntu:24.04 AS build
+FROM ubuntu:26.04 AS build
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -57,7 +57,7 @@ RUN cmake /src \
     && cmake --build build/Release --target xmljson-service
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:26.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 
